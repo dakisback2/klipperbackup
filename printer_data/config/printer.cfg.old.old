@@ -1,0 +1,1224 @@
+# This file contains common pin mappings for the BigTreeTech Octopus V1.
+# To use this config, the firmware should be compiled for the STM32F446 with a "32KiB bootloader"
+# Enable "extra low-level configuration options" and select the "12MHz crystal" as clock reference
+
+# after running "make", copy the generated "klipper/out/klipper.bin" file to a
+# file named "firmware.bin" on an SD card and then restart the OctoPus with that SD card.
+
+# See docs/Config_Reference.md for a description of parameters.
+
+## Voron Design VORON2 250/300/350mm BigTreeTech OctoPus V1 TMC2209 UART config
+
+## *** THINGS TO CHANGE/CHECK: ***
+## MCU paths                            [mcu] section
+## Thermistor types                     [extruder] and [heater_bed] sections - See https://www.klipper3d.org/Config_Reference.html#common-thermistors for common thermistor types
+## Z Endstop Switch location            [safe_z_home] section
+## Homing end position                  [gcode_macro G32] section
+## Z Endstop Switch  offset for Z0      [stepper_z] section
+## Probe points                         [quad_gantry_level] section
+## Min & Max gantry corner postions     [quad_gantry_level] section
+## PID tune                             [extruder] and [heater_bed] sections
+## Probe pin                            [probe] section
+## Fine tune E steps                    [extruder] section
+[include mainsail.cfg]
+[include stealthburner_leds.cfg]
+#[include homing.cfg]
+
+[force_move]
+enable_force_move: True
+
+[mcu]
+##  Obtain definition by "ls -l /dev/serial/by-id/" then unplug to verify
+##--------------------------------------------------------------------
+serial: /dev/serial/by-id/usb-Klipper_stm32h723xx_310041000F51323532393433-if00
+restart_method: command
+##--------------------------------------------------------------------
+
+[mcu H36]
+
+serial: /dev/serial/by-id/usb-Klipper_stm32g0b1xx_41002A000950415742363820-if00
+restart_method: command
+
+[mcu cartographer]
+#canbus_uuid: 0ca8d67388c2 
+serial: /dev/serial/by-id/usb-Cartographer_614e_3C001C001943303854303720-if00
+is_non_critical: True
+#    adjust to suit your scanner, if using usb change to serial
+
+[cartographer]
+mcu: cartographer            
+#   Offsets are measured from the centre of your coil, to the tip of your nozzle 
+#   on a level axis. It is vital that this is accurate. 
+x_offset: 0                          
+#    adjust for your cartographers offset from nozzle to middle of coil
+y_offset: 27.5
+verbose: yes
+
+
+[temperature_sensor cartographer]
+sensor_type: temperature_mcu
+sensor_mcu: cartographer
+min_temp: 5
+max_temp: 130
+
+
+[delayed_gcode RESTORE_PROBE_OFFSET]
+initial_duration: 1.
+gcode:
+  {% set svv = printer.save_variables.variables %}
+  {% if not printer["gcode_macro SET_GCODE_OFFSET"].restored %}
+    SET_GCODE_VARIABLE MACRO=SET_GCODE_OFFSET VARIABLE=runtime_offset VALUE={ svv.nvm_offset|default(0) }
+    SET_GCODE_VARIABLE MACRO=SET_GCODE_OFFSET VARIABLE=restored VALUE=True
+  {% endif %}
+
+
+
+[adxl345]
+
+cs_pin: cartographer:PA3
+spi_bus: spi1
+
+[resonance_tester]
+accel_chip: adxl345
+probe_points: 175, 175, 20 # Fill out the blank with x and y coordinates where you want to run the resonance test.
+
+[input_shaper]
+shaper_freq_x: 91.2 # center frequency for the X axis filter
+shaper_type_x: ei # filter type for the X axis
+smoother_freq_y: 46.0 # center frequency for the Y axis filter
+shaper_type_y: smooth_zv # filter type for the Y axis
+#shaper_freq_y: 46.0
+damping_ratio_x: .045 # damping ratio for the X axis
+#damping_ratio_y: .036 # damping ratio for the Y axis
+
+[shaketune]
+result_folder: ~/printer_data/config/ShakeTune_results
+#    Path where the processed results will be stored. If the folder doesn't exist,
+#    it will be automatically created. You can change this if you'd like to store 
+#    results in a different location.
+number_of_results_to_keep: 10
+#    This setting defines how many results you want to keep in the result folder.
+#    Once the specified number is exceeded, older results will be automatically deleted
+#    to free up space on the SD card and avoid cluttering the results folder.
+keep_raw_data: False
+#    If set to True, Shake&Tune will store both the processed graphs and the raw accelerometer
+#    .stdata files in the results folder. This can be useful for debugging or archiving purposes.
+#    Please always attach them when reporting any issues on GitHub or Discord.
+show_macros_in_webui: True
+#    Mainsail and Fluidd doesn't create buttons for system commands (macros that are not part
+#    of the printer.cfg file). This option allow Shake&Tune to inject them into the webui at runtime.
+#    If set to False, the macros will be hidden but still accessible from the console by typing
+#    their names manually, which can be useful if you prefer to encapsulate them into your own macros.
+timeout: 600
+#    This defines the maximum processing time (in seconds) to allows to Shake&Tune for generating 
+#    graphs from a .stdata file. 10 minutes should be more than enough in most cases, but if you have
+#    slower hardware (e.g., older SD cards or low-performance devices), increase it to prevent timeouts.
+measurements_chunk_size: 10
+#    Each Shake&Tune command uses the accelerometer to take multiple measurements. By default,
+#    Shake&Tune will write a chunk of data to disk every two measurements, and at the end of the
+#    command will merge these chunks into the final .stdata file for processing. "2" is a very
+#    conservative setting to avoid Klipper Timer Too Close errors on lower end devices with little
+#    RAM, and should work for everyone. However, if you are using a powerful computer, you may
+#    wish to increase this value to keep more measurements in memory (e.g., 15-20) before writing
+#    the chunk and avoid stressing the filesystem too much.
+max_freq: 200
+#    This setting defines the maximum frequency at which the calculation of the power spectral density
+#    is cutoff. The default value should be fine for most machines and accelerometer combinations and
+#    avoid touching it unless you know what you're doing.
+dpi: 300
+#    Controls the resolution of the generated graphs. The default value of 300 dpi was optimized
+#    and strikes a balance between performance and readability, ensuring that graphs are clear
+#    without using too much RAM to generate them. Usually, you shouldn't need to change this value.
+
+[exclude_object]
+
+# [autotune_tmc stepper_x]
+# motor: moons-ms17hd6p420I-04
+# sg4_thrs: 80
+# [autotune_tmc stepper_y]
+# motor: moons-ms17hd6p420I-04
+# sg4_thrs: 115
+
+# [autotune_tmc stepper_z]
+# motor: moons-ms17hd6p420I-04
+# [autotune_tmc stepper_z1]
+# motor: moons-ms17hd6p420I-04
+# [autotune_tmc stepper_z2]
+# motor: moons-ms17hd6p420I-04
+# [autotune_tmc stepper_z3]
+# motor: moons-ms17hd6p420I-04
+
+# [autotune_tmc extruder]
+# motor: moons-cse14hra1l410a
+[printer]
+kinematics: corexy
+max_velocity: 500  
+max_accel: 20000             #Max 4000
+max_z_velocity: 15          #Max 15 for 12V TMC Drivers, can increase for 24V
+max_z_accel: 350
+square_corner_velocity: 5.0
+
+[axis_twist_compensation]
+calibrate_start_x: 50
+calibrate_end_x: 300
+calibrate_y: 175
+calibrate_start_y: 25
+calibrate_end_y: 275
+calibrate_x: 175
+#####################################################################
+#   X/Y Stepper Settings
+#####################################################################
+
+##  B Stepper - Left
+##  Connected to MOTOR_0
+##  Endstop connected to DIAG_0
+# [stepper_x]
+# high_precision_step_compress: True
+# step_pin: PF13
+# dir_pin: PF12
+# enable_pin: !PF14
+# rotation_distance: 40
+# microsteps: 64
+# full_steps_per_rotation:200  #set to 400 for 0.9 degree stepper
+# endstop_pin: tmc2209_stepper_x:virtual_endstop #PG6
+# position_min: 0
+# ##--------------------------------------------------------------------
+
+# ##  Uncomment below for 250mm build
+# #position_endstop: 250
+# #position_max: 250
+
+# ##  Uncomment for 300mm build
+# #position_endstop: 300
+# #position_max: 300
+
+# ##  Uncomment for 350mm build
+# position_endstop: 350
+# position_max: 350
+
+# ##--------------------------------------------------------------------
+# homing_speed: 100   #Max 100
+# homing_retract_dist: 20
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_x]
+# uart_pin: PC4
+# diag_pin: ^PG6
+# #driver_SGTHRS: 120
+# interpolate: true
+# run_current: 1
+# #home_current: 0.49
+# #current_change_dwell_time: 0.2
+# sense_resistor: 0.110
+
+# ##  A Stepper - Right
+# ##  Connected to MOTOR_1
+# ##  Endstop connected to DIAG_1
+# [stepper_y]
+# high_precision_step_compress: True
+# step_pin: PG0
+# dir_pin: PG1
+# enable_pin: !PF15
+# rotation_distance: 40
+# microsteps: 64
+# full_steps_per_rotation:200  #set to 400 for 0.9 degree stepper
+# endstop_pin: tmc2209_stepper_y:virtual_endstop #PG9
+# position_min: 0
+# ##--------------------------------------------------------------------
+
+# ##  Uncomment for 250mm build
+# #position_endstop: 250
+# #position_max: 250
+
+# ##  Uncomment for 300mm build
+# #position_endstop: 300
+# #position_max: 300
+
+# ##  Uncomment for 350mm build
+# position_endstop: 358
+# position_max: 358
+
+# ##--------------------------------------------------------------------
+# homing_speed: 100  #Max 100
+# homing_retract_dist: 20
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_y]
+# uart_pin: PD11
+# interpolate: true
+# diag_pin: ^PG9
+# #driver_SGTHRS: 140
+# run_current: 1
+# #home_current: 0.49
+# #current_change_dwell_time: 0.2
+# sense_resistor: 0.110
+ 
+# #####################################################################
+# #   Z Stepper Settings
+# #####################################################################
+
+# ## Z0 Stepper - Front Left
+# ##  Connected to MOTOR_2
+# ##  Endstop connected to DIAG_2
+# [stepper_z]
+# step_pin: PF11
+# dir_pin: PG3
+# enable_pin: !PG5
+# rotation_distance: 40
+# gear_ratio: 80:16
+# microsteps: 64
+# endstop_pin: probe:z_virtual_endstop
+# homing_retract_dist: 0
+# ##  Z-position of nozzle (in mm) to z-endstop trigger point relative to print surface (Z0)
+# ##  (+) value = endstop above Z0, (-) value = endstop below
+# ##  Increasing position_endstop brings nozzle closer to the bed
+# ##  After you run Z_ENDSTOP_CALIBRATE, position_endstop will be stored at the very end of your config
+# #position_endstop: -0.5
+# ##--------------------------------------------------------------------
+
+# ##  Uncomment below for 250mm build
+# #position_max: 210
+
+# ##  Uncomment below for 300mm build
+# #position_max: 260
+
+# ##  Uncomment below for 350mm build
+# position_max: 310
+
+# ##--------------------------------------------------------------------
+# position_min: -5
+# homing_speed: 8
+# second_homing_speed: 3
+# homing_retract_dist: 3
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_z]
+# uart_pin: PC6
+# diag_pin: !PG10
+# interpolate: true
+# run_current: 1
+# sense_resistor: 0.110
+
+# ##  Z1 Stepper - Rear Left
+# ##  Connected to MOTOR_3
+# [stepper_z1]
+# step_pin: PG4
+# dir_pin: !PC1
+# #enable_pin: !PA0
+# rotation_distance: 40
+# gear_ratio: 80:16
+# microsteps: 64
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_z1]
+# uart_pin: PC7
+# diag_pin: !PG11
+# interpolate: true
+# run_current: 1
+# sense_resistor: 0.110
+
+# ##  Z2 Stepper - Rear Right
+# ##  Connected to MOTOR_4
+# [stepper_z2]
+# step_pin: PF9
+# dir_pin: PF10
+# enable_pin: !PG2
+# rotation_distance: 40
+# gear_ratio: 80:16
+# microsteps: 64
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_z2]
+# uart_pin: PF2
+# diag_pin: !PG12
+# interpolate: true
+# run_current: 1
+# sense_resistor: 0.110
+
+# ##  Z3 Stepper - Front Right
+# ##  Connected to MOTOR_5
+# [stepper_z3]
+# step_pin: PC13
+# dir_pin: !PF0
+# enable_pin: !PF1
+# rotation_distance: 40
+# gear_ratio: 80:16
+# microsteps: 64
+
+# ##  Make sure to update below for your relevant driver (2208 or 2209)
+# [tmc2209 stepper_z3]
+# uart_pin: PE4
+# #diag_pin: !PG13
+# interpolate: true
+# run_current: 1
+# sense_resistor: 0.110
+
+
+#####################################################################
+#   Extruder
+#####################################################################
+[verify_heater extruder]
+max_error: 150
+hysteresis: 10
+##  Connected to MOTOR_6
+##  Heater - HE0
+##  Thermistor - T0
+[extruder]
+step_pin: H36:PB9
+dir_pin: !H36:PB8
+enable_pin: !H36:PB7
+##  Update value below when you perform extruder calibration
+##  If you ask for 100mm of filament, but in reality it is 98mm:
+##  rotation_distance = <previous_rotation_distance> * <actual_extrude_distance> / 100
+##  22.6789511 is a good starting point
+rotation_distance: 22.333097095725   #Bondtech 5mm Drive Gears
+##  Update Gear Ratio depending on your Extruder Type
+##  Use 50:10 for Stealthburner/Clockwork 2
+##  Use 50:17 for Afterburner/Clockwork (BMG Gear Ratio)
+##  Use 80:20 for M4, M3.1
+gear_ratio: 50:10               #BMG Gear Ratio
+microsteps: 32
+full_steps_per_rotation: 200    #200 for 1.8 degree, 400 for 0.9 degree
+nozzle_diameter: 0.400
+filament_diameter: 1.75
+heater_pin: H36:PA7
+## Check what thermistor type you have. See https://www.klipper3d.org/Config_Reference.html#common-thermistors for common thermistor types.
+## Use "Generic 3950" for NTC 100k 3950 thermistors
+sensor_type: PT1000
+sensor_pin: H36:PA6
+pullup_resistor: 2200
+min_temp: 10
+max_temp: 375
+max_power: 1.0
+min_extrude_temp: 170
+#control = pid
+#pid_kp = 26.213
+#pid_ki = 1.304
+#pid_kd = 131.721
+##  Try to keep pressure_advance below 1.0
+pressure_advance: 0.045
+##  Default is 0.040, leave stock
+#pressure_advance_smooth_time: 0.040
+
+##  E0 on MOTOR6
+##  Make sure to update below for your relevant driver (2208 or 2209)
+[tmc2209 extruder]
+uart_pin: H36:PC14
+diag_pin: H36:PC15
+interpolate: true
+run_current: 0.5
+sense_resistor: 0.110
+
+
+#####################################################################
+#   Bed Heater
+#####################################################################
+
+##  SSR Pin - HE1
+##  Thermistor - TB
+[heater_bed]
+##  Uncomment the following line if using the default SSR wiring from the docs site
+heater_pin: PF7
+##  Other wiring guides may use BED_OUT to control the SSR. Uncomment the following line for those cases
+#heater_pin: PA1
+## Check what thermistor type you have. See https://www.klipper3d.org/Config_Reference.html#common-thermistors for common thermistor types.
+## Use "Generic 3950" for Keenovo heaters
+sensor_type: Generic 3950
+sensor_pin: PB1
+##  Adjust Max Power so your heater doesn't warp your bed. Rule of thumb is 0.4 watts / cm^2 .
+max_power: 0.8
+min_temp: 0
+max_temp: 120
+#control: pid
+#pid_kp: 58.437
+#pid_ki: 2.347
+#pid_kd: 363.769
+
+#####################################################################
+#   Probe
+#####################################################################
+
+##  Inductive Probe
+##  This probe is not used for Z height, only Quad Gantry Leveling
+##[probe]
+
+#--------------------------------------------------------------------
+
+## Select the probe port by type:
+## For the PROBE port. Will not work with Diode. May need pull-up resistor from signal to 24V.
+#pin: ~!PB7
+## For the DIAG_7 port. NEEDS BAT85 DIODE! Change to !PG15 if probe is NO.
+##pin: H36:!PA8
+## For Octopus Pro PROBE port; NPN and PNP proximity switch types can be set by jumper
+#pin: ~!PC5
+
+#--------------------------------------------------------------------
+
+##x_offset: 0
+##y_offset: 25.0
+#z_offset: 0
+##speed: 10.0
+##samples: 3
+##samples_result: median
+##sample_retract_dist: 3.0
+##samples_tolerance: 0.006
+##samples_tolerance_retries: 3
+
+#####################################################################
+#   Fan Control
+#####################################################################
+
+
+[multi_pin printcool_fan]
+pins: H36:PA9,H36:PB15
+
+[multi_pin Bed_fans]
+pins: PA0,PA1,PA2
+
+[fan_generic BedFans]
+pin: multi_pin:Bed_fans
+#cycle_time: .05
+kick_start_time: .5
+
+##  Print Cooling Fan - FAN0
+[fan]
+pin: multi_pin:printcool_fan
+kick_start_time: 0.5
+##  Depending on your fan, you may need to increase this value
+##  if your fan will not start. Can change cycle_time (increase)
+##  if your fan is not able to slow down effectively
+off_below: 0.10
+
+##  Print Cooling Fan - FAN1
+##[fan]
+##pin: H36:PB15
+##kick_start_time: 0.5
+##  Depending on your fan, you may need to increase this value
+##  if your fan will not start. Can change cycle_time (increase)
+##  if your fan is not able to slow down effectively
+##off_below: 0.10
+
+##  Hotend Fan - FAN1
+[heater_fan hotend_fan]
+pin: H36:PB13
+max_power: 1.0
+kick_start_time: 0.5
+heater: extruder
+heater_temp: 50.0
+##  If you are experiencing back flow, you can reduce fan_speed
+fan_speed: .6
+
+##  Controller fan - FAN2
+[controller_fan controller_fan_1]
+pin: PA3
+kick_start_time: 5
+heater: heater_bed
+fan_speed: .4
+cycle_time: 0.0000151
+
+[controller_fan controller_fan_2]
+pin: PA4
+kick_start_time: 5
+heater: heater_bed
+fan_speed: .4
+cycle_time: 0.0000151
+
+
+#####################################################################
+#   LED Control
+#####################################################################
+
+## Chamber Lighting - HE2 Connector (Optional)
+#[output_pin caselight]
+#pin: PB10
+#pwm:true
+#shutdown_value: 0
+#value:1
+#cycle_time: 0.01
+
+#####################################################################
+#   Homing and Gantry Adjustment Routines
+#####################################################################
+
+[idle_timeout]
+timeout: 1800
+
+[safe_z_home]
+##  XY Location of the Z Endstop Switch
+##  Update -10,-10 to the XY coordinates of your endstop pin 
+##  (such as 157,305) after going through Z Endstop Pin
+##  Location Definition step.
+home_xy_position:175.00,175.00
+speed:200
+z_hop:10
+z_hop_speed:25
+
+
+##  Use QUAD_GANTRY_LEVEL to level a gantry.
+##  Min & Max gantry corners - measure from nozzle at MIN (0,0) and 
+##  MAX (250, 250), (300,300), or (350,350) depending on your printer size
+##  to respective belt positions
+[quad_gantry_level]
+
+#--------------------------------------------------------------------
+##  Gantry Corners for 250mm Build
+##  Uncomment for 250mm build
+#gantry_corners:
+#   -60,-10
+#   310, 320
+##  Probe points
+#points:
+#   50,25
+#   50,175
+#   200,175
+#   200,25
+    
+##  Gantry Corners for 300mm Build
+##  Uncomment for 300mm build
+#gantry_corners:
+#   -60,-10
+#   360,370
+##  Probe points
+#points:
+#   50,25
+#   50,225
+#   250,225
+#   250,25
+
+##  Gantry Corners for 350mm Build
+##  Uncomment for 350mm build
+gantry_corners:
+   -60,-10
+   410,420
+##  Probe points
+points:
+   50,25
+   50,275
+   300,275
+   300,25
+
+#--------------------------------------------------------------------
+speed: 500
+horizontal_move_z: 5
+retries: 5
+retry_tolerance: 0.0075
+max_adjust: 10
+
+########################################
+# EXP1 / EXP2 (display) pins
+########################################
+
+[board_pins]
+aliases:
+    # FPC header, Aliases EXP1 & EXP2 for mini12864
+    EXP1_1=PG5, EXP1_2=PG4,
+    EXP1_3=PG3, EXP1_4=PG2,
+    EXP1_5=PD15, EXP1_6=PD14,
+    EXP1_7=PD13, EXP1_8=PD12,
+    EXP1_9=<GND>, EXP1_10=<5V>,
+
+    # EXP2 header
+    EXP2_1=PE13, EXP2_2=PE12,
+    EXP2_3=PG8, EXP2_4=PE11,
+    EXP2_5=PG7, EXP2_6=PE14,
+    EXP2_7=PG6, EXP2_8=<RST>,
+    EXP2_9=<GND>, EXP2_10=<NC>
+
+#####################################################################
+#   Displays
+#####################################################################
+
+##  Uncomment the display that you have
+#--------------------------------------------------------------------
+
+
+##  RepRapDiscount 128x64 Full Graphic Smart Controller
+#[display]
+#lcd_type: st7920
+#cs_pin: EXP1_4
+#sclk_pin: EXP1_5
+#sid_pin: EXP1_3
+#menu_timeout: 40
+#encoder_pins: ^EXP2_5, ^EXP2_3
+#click_pin: ^!EXP1_2
+
+#[output_pin beeper]
+#pin: EXP1_1
+
+#--------------------------------------------------------------------
+
+
+##  mini12864 LCD Display
+[display]
+lcd_type: uc1701
+cs_pin: EXP1_3
+a0_pin: EXP1_4
+rst_pin: EXP1_5
+encoder_pins: ^EXP2_5, ^EXP2_3
+click_pin: ^!EXP1_2
+contrast: 63
+spi_software_miso_pin: EXP2_1
+spi_software_mosi_pin: EXP2_6
+spi_software_sclk_pin: EXP2_2
+
+##  To control Neopixel RGB in mini12864 display
+[neopixel btt_mini12864]
+pin: EXP1_6
+chain_count: 3
+initial_RED: 0.1
+initial_GREEN: 0.5
+initial_BLUE: 0.0
+color_order: RGB
+
+##  Set RGB values on boot up for each Neopixel. 
+##  Index 1 = display, Index 2 and 3 = Knob
+[delayed_gcode setdisplayneopixel]
+initial_duration: 1
+gcode:
+        SET_LED LED=btt_mini12864 RED=1 GREEN=1 BLUE=1 INDEX=1 TRANSMIT=0
+        SET_LED LED=btt_mini12864 RED=1 GREEN=0 BLUE=0 INDEX=2 TRANSMIT=0
+        SET_LED LED=btt_mini12864 RED=1 GREEN=0 BLUE=0 INDEX=3 
+
+#--------------------------------------------------------------------
+[bed_mesh]
+zero_reference_position: 175, 175    
+#    set this to the middle of your bed
+speed: 300
+#    movement speed of toolhead during bed mesh
+horizontal_move_z: 5
+#    height of scanner during bed mesh scan
+mesh_min: 16, 28
+#    start point of bed mesh [X, Y]
+mesh_max: 330, 335
+#    end point of bed mesh [X, Y]
+probe_count: 30, 30
+algorithm: bicubic
+adaptive_margin: 15
+
+
+#####################################################################
+#   Macros
+#####################################################################
+[gcode_macro _BEDFANVARS]
+variable_threshold: 100		# If bed temp target is above this threshold, fans tun on slow, until target reached, then turn on fast.
+variable_slowthreshold: 50	# AKInferno Added: if the bed temp target is above this threshold, fans turn on and stay slow.
+variable_fast: 1.0		# Current of fast Fan speed
+variable_slow: 0.3		# Current of slow Fan speed (while bed is heating / for targets below top threshold / fan speed during cooldown 
+variable_offthreshold: 45  	# AKInferno Added: run fan after bed is turned off, until the bed temp falls below this temp.
+gcode:
+[gcode_macro BEDFANSSLOW]
+gcode:
+	# Vars
+	{% set SLOW = printer["gcode_macro _BEDFANVARS"].slow|float %}
+	SET_FAN_SPEED FAN=BedFans SPEED={SLOW}
+
+[gcode_macro BEDFANSFAST]
+gcode:
+	# Vars
+	{% set FAST = printer["gcode_macro _BEDFANVARS"].fast|float %}
+	SET_FAN_SPEED FAN=BedFans SPEED={FAST}
+
+[gcode_macro BEDFANSOFF]
+gcode:
+	SET_FAN_SPEED FAN=BedFans SPEED=0
+
+############ Command overrides ############
+
+# Override, set fan speeds to low and start monitoring loop.
+[gcode_macro SET_HEATER_TEMPERATURE]
+rename_existing: _SET_HEATER_TEMPERATURE
+gcode:
+	# Parameters
+	{% set HEATER = params.HEATER|default("None") %}
+	{% set TARGET = params.TARGET|default(0)|int %}
+	# Vars
+	{% set THRESHOLD = printer["gcode_macro _BEDFANVARS"].threshold|int %}
+	{% set SLOWTHRESHOLD = printer["gcode_macro _BEDFANVARS"].slowthreshold|int %}
+	
+	{% if HEATER|lower == "extruder" %}
+		M104 S{TARGET}
+	{% elif HEATER|lower == "heater_bed" %}
+		M99140 S{TARGET}
+	{% else %}
+		{action_respond_info("Heater %s not supported" % HEATER)}
+	{% endif %}
+
+	# Set fans to low if heater_bed temp is requested above threshold temp, and kick off monitoring loop.
+	{% if HEATER|lower == "heater_bed" %}
+		{% if TARGET >= THRESHOLD %}
+			BEDFANSSLOW
+			UPDATE_DELAYED_GCODE ID=bedfanloop DURATION=1
+		{% elif TARGET >= SLOWTHRESHOLD %}	# added this to Ellis' original config to turn fans on low, but not start the monitoring loop for targets in PLA/PETG range. 
+			BEDFANSSLOW
+		{% else %}
+			TURN_OFF_HEATERS
+		{% endif %}
+	{% endif %}
+	
+# Override M190 (Wait for Bed Temperature)
+# As a bonus, use TEMPERATURE_WAIT so we don't have to wait for PID to level off.
+[gcode_macro M190]
+rename_existing: M99190
+gcode:
+	# Parameters
+	{% set S = params.S|int %}
+	# Vars
+	{% set THRESHOLD = printer["gcode_macro _BEDFANVARS"].threshold|int %}
+	
+	{% if S >= THRESHOLD %}
+		BEDFANSSLOW																# >= Threshold temp: Low speed fans while heating 
+	{% else %}
+		TURN_OFF_HEATERS														# < Threshold temp: Turn bed fans off
+	{% endif %}                                        
+
+	M140 {% for p in params
+	  %}{'%s%s' % (p, params[p])}{%
+	  endfor %}																	# Set bed temp
+	  
+	{% if S != 0 %}
+		TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={S|int} MAXIMUM={S|int + 5}	# Wait for bed temp within 5 degrees
+	{% endif %}
+
+	# Post-heating fan speeds
+	{% if S >= THRESHOLD %}								    
+		BEDFANSFAST																# >= Threshold temp: Higher speed fans after heating finished
+	{% endif %}
+	
+# Replace M140 (Set Bed Temperature) to just be an alias of SET_HEATER_TEMPERATURE (which has associated bed fan logic if enabled)
+[gcode_macro M140]
+rename_existing: M99140
+gcode:
+	# Parameters
+	{% set S = params.S|float %}
+	SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET={S}
+	
+# Replace TURN_OFF_HEATERS
+[gcode_macro TURN_OFF_HEATERS]
+rename_existing: _TURN_OFF_HEATERS
+gcode:
+	_TURN_OFF_HEATERS											# Turn off heaters
+ 	{% if printer.heater_bed.temperature|int >= printer["gcode_macro _BEDFANVARS"].offthreshold %}		# If bed temp is above Off Theshold, start timer for bedfan for 5min and shutdown heaters
+		UPDATE_DELAYED_GCODE ID=bedfanloop DURATION=300	
+	{% endif %}
+
+################ Monitoring loop #####################
+
+# Turns bed fans to "fast" speed once target bed temp is reached.
+[delayed_gcode bedfanloop]
+gcode:
+	# Vars
+	{% set THRESHOLD = printer["gcode_macro _BEDFANVARS"].threshold|int %}
+	{% set COOLDOWN = printer["gcode_macro _BEDFANVARS"].offthreshold %}
+	
+	{% if printer.heater_bed.target >= THRESHOLD %}								# Continue only if target temp greater than threshold.
+		{% if printer.heater_bed.temperature|int >= (printer.heater_bed.target|int - 1) %}
+			BEDFANSFAST										# If within 1 degree of target temp: Higher speed fans
+		{% else %}
+			UPDATE_DELAYED_GCODE ID=bedfanloop DURATION=5						# If temp not reached yet: loop again
+		{% endif %}
+	{% elif printer.heater_bed.target == 0 %}								# If TARGET is 0 (So fans turned off)
+		{% if printer.heater_bed.temperature|int >= COOLDOWN %}							# AND if Bed temperature is above Off Threshold
+			BEDFANSSLOW												# Set to slow fanspeed
+			UPDATE_DELAYED_GCODE ID=bedfanloop DURATION=300								# start timer to check again in 5 min
+		{% else %}
+			BEDFANSOFF					# TARGET is 0 and bed temp is < Off Threshold turn Filter off and don't restart timer
+		{% endif %}
+	{% endif %}
+
+[gcode_macro G32]
+gcode:
+    SAVE_GCODE_STATE NAME=STATE_G32
+    G90
+    G28
+    QUAD_GANTRY_LEVEL
+    G28
+    ##  Uncomment for for your size printer:
+    #--------------------------------------------------------------------
+    ##  Uncomment for 250mm build
+    #G0 X125 Y125 Z30 F3600
+    
+    ##  Uncomment for 300 build
+    #G0 X150 Y150 Z30 F3600
+    
+    ##  Uncomment for 350mm build
+    #G0 X175 Y175 Z30 F3600
+    #--------------------------------------------------------------------
+    RESTORE_GCODE_STATE NAME=STATE_G32
+
+[gcode_macro CLEAN_NOZZLE_PARK]
+gcode:
+ {% if "xyz" not in printer.toolhead.homed_axes %}
+   G28
+ {% endif %}
+
+  G90
+
+  ## Ooze position. Set this position right above the bucket.
+  G1 X325 Y352 Z1 F6000
+
+[gcode_macro CLEAN_NOZZLE]
+variable_start_x: 296   ; Set this X distance so that it's at the right edge of the scrubber.
+variable_start_y: 353  ; Set this Y distance so that the nozzle is above the rear row of bristles.
+variable_start_z: 0.35   ; Set this Z distance so that the nozzle tip is buried in the scrubber.
+variable_wipe_dist: -35
+variable_wipe_qty: 5
+variable_wipe_spd: 200
+variable_raise_distance: 10
+
+gcode:
+ {% if "xyz" not in printer.toolhead.homed_axes %}
+   G28
+ {% endif %}
+ 
+ G90                                            ; absolute positioning
+ 
+ ## Move nozzle to start position
+ G1 X{start_x} Y{start_y} F6000
+ G1 Z{start_z} F1500
+
+ ## Wipe nozzle
+ {% for wipes in range(1, (wipe_qty + 1)) %}
+   G1 X{start_x + wipe_dist} Y{start_y} F{wipe_spd * 60}
+   G1 X{start_x} Y{start_y} F{wipe_spd * 60}
+   G1 X{start_x + wipe_dist} Y{start_y - 5} F{wipe_spd * 60}
+   G1 X{start_x} Y{start_y -5} F{wipe_spd * 60}
+ {% endfor %}
+
+ ## Raise nozzle
+ G1 X{start_x + 8} Z{raise_distance}
+
+#####################################################################
+#   A better print_start macro for v2/trident
+#####################################################################
+
+## *** THINGS TO UNCOMMENT: ***
+## Bed mesh (2 lines at 2 locations)
+## Nevermore (if you have one)
+## Z_TILT_ADJUST (For Trident only)
+## QUAD_GANTRY_LEVEL (For V2.4 only)
+
+[gcode_macro PRINT_START]
+gcode:
+  # This part fetches data from your slicer. Such as bed, extruder, and chamber temps and size of your printer.
+  {% set target_bed = params.BED|int %}
+  {% set target_extruder = params.EXTRUDER|int %}
+  {% set target_chamber = params.CHAMBER|default("45")|int %}
+  {% set x_wait = printer.toolhead.axis_maximum.x|float / 2 %}
+  {% set y_wait = printer.toolhead.axis_maximum.y|float / 2 %}
+
+  SET_GCODE_OFFSET Z=0                                 # Set offset to 0
+
+  # Home the printer, set absolute positioning and update the Stealthburner LEDs.
+  STATUS_HOMING                                         # Set LEDs to homing-mode
+  G28                                                   # Full home (XYZ)
+  G90                                                   # Absolute position
+
+  ##  Uncomment for bed mesh (1 of 2 for bed mesh)
+  #BED_MESH_CLEAR                                       # Clear old saved bed mesh (if any)
+
+  # Check if the bed temp is higher than 90c - if so then trigger a heatsoak.
+  {% if params.BED|int > 90 %}
+    SET_DISPLAY_TEXT MSG="Bed: {target_bed}c"           # Display info on display
+    STATUS_HEATING                                      # Set LEDs to heating-mode
+    M106 S255                                           # Turn on the PT-fan
+
+    ##  Uncomment if you have a Nevermore.
+    #SET_PIN PIN=nevermore VALUE=1                      # Turn on the nevermore
+
+    G1 X{x_wait} Y{y_wait} Z15 F9000                    # Go to center of the bed
+    M190 S{target_bed}                                  # Set the target temp for the bed
+    SET_DISPLAY_TEXT MSG="Heatsoak: {target_chamber}c"  # Display info on display
+    TEMPERATURE_WAIT SENSOR="temperature_sensor cartographer" MINIMUM={target_chamber}   # Waits for chamber temp
+
+  # If the bed temp is not over 90c, then skip the heatsoak and just heat up to set temp with a 5 min soak
+  {% else %}
+    SET_DISPLAY_TEXT MSG="Bed: {target_bed}c"           # Display info on display
+    STATUS_HEATING                                      # Set LEDs to heating-mode
+    G1 X{x_wait} Y{y_wait} Z15 F9000                    # Go to center of the bed
+    M190 S{target_bed}                                  # Set the target temp for the bed
+    SET_DISPLAY_TEXT MSG="Soak for 5 min"               # Display info on display
+    G4 P300000                                          # Wait 5 min for the bedtemp to stabilize
+  {% endif %}
+
+  # Heat hotend to 150c. This helps with getting a correct Z-home.
+  SET_DISPLAY_TEXT MSG="Hotend: 150c"                   # Display info on display
+  M109 S150                                             # Heat hotend to 150c
+
+  ##  Uncomment for Trident (Z_TILT_ADJUST)
+  #SET_DISPLAY_TEXT MSG="Leveling"                      # Display info on display
+  #STATUS_LEVELING                                      # Set LEDs to leveling-mode
+  #Z_TILT_ADJUST                                        # Level the printer via Z_TILT_ADJUST
+  #G28 Z                                                # Home Z again after Z_TILT_ADJUST
+
+  ##  Uncomment for V2.4 (Quad gantry level AKA QGL)
+  SET_DISPLAY_TEXT MSG="Leveling"                      # Display info on display
+  STATUS_LEVELING                                      # Set LEDs to leveling-mode
+  QUAD_GANTRY_LEVEL                                    # Level the printer via QGL
+  G28 Z                                                # Home Z again after QGL
+
+  ##  Uncomment for bed mesh (2 of 2 for bed mesh)
+  SET_DISPLAY_TEXT MSG="Bed mesh"                      # Display info on display
+  STATUS_MESHING                                       # Set LEDs to bed mesh-mode
+  BED_MESH_CALIBRATE                                   # Start the bed mesh (add ADAPTIVE=1) for adaptive bed mesh
+  CLEAN_NOZZLE
+  CARTOGRAPHER_TOUCH_HOME                              # Calibrate z offset only with hot nozzle
+
+  # Heat up the hotend up to target via data from slicer
+  SET_DISPLAY_TEXT MSG="Hotend: {target_extruder}c"     # Display info on display
+  STATUS_HEATING                                        # Set LEDs to heating-mode
+  CLEAN_NOZZLE_PARK                                     # Park Nozzle and prep for heating
+  M107                                                  # Turn off partcooling fan
+  M109 S{target_extruder}                               # Heat the hotend to set temp
+
+  # Get ready to print by doing a primeline and updating the LEDs
+  SET_DISPLAY_TEXT MSG="Printer goes brr"               # Display info on display
+  STATUS_PRINTING                                       # Set LEDs to printing-mode                                                 # Incremental positioning 
+  CLEAN_NOZZLE
+  G92 E0 ; Reset Extruder
+  G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
+  G1 X4 Y20 Z0.2 F30000.0 ; Move to start position
+  G1 X4 Y200.0 Z0.2 F6000.0 E15 ; Draw the first line
+  G1 X5 Y200.0 Z0.2 F6000.0 ; Move to side a little
+  G1 X5 Y20 Z0.2 F6000.0 E30 ; Draw the second line
+  G92 E0 ; Reset Extruder
+
+#   Use PRINT_END for the slicer ending script - please customise for your slicer of choice
+[gcode_macro PRINT_END]
+gcode:
+    # safe anti-stringing move coords
+    {% set th = printer.toolhead %}
+    {% set x_safe = th.position.x + 20 * (1 if th.axis_maximum.x - th.position.x > 20 else -1) %}
+    {% set y_safe = th.position.y + 20 * (1 if th.axis_maximum.y - th.position.y > 20 else -1) %}
+    {% set z_safe = [th.position.z + 2, th.axis_maximum.z]|min %}
+    
+    SAVE_GCODE_STATE NAME=STATE_PRINT_END
+    
+    M400                           ; wait for buffer to clear
+    G92 E0                         ; zero the extruder
+    G1 E-5.0 F1800                 ; retract filament
+    
+    TURN_OFF_HEATERS
+    
+    G90                                      ; absolute positioning
+    G0 X{x_safe} Y{y_safe} Z{z_safe} F20000  ; move nozzle to remove stringing
+    G0 X{th.axis_maximum.x//2} Y{th.axis_maximum.y - 2} F3600  ; park nozzle at rear
+    M107                                     ; turn off fan
+    
+    BED_MESH_CLEAR
+    RESTORE_GCODE_STATE NAME=STATE_PRINT_END
+
+
+[gcode_macro TEST_SPEED]
+# Home, get position, throw around toolhead, home again.
+# If MCU stepper positions (first line in GET_POSITION) are greater than a full step different (your number of microsteps), then skipping occured.
+# We only measure to a full step to accomodate for endstop variance.
+# Example: TEST_SPEED SPEED=300 ACCEL=5000 ITERATIONS=10
+
+description: Test for max speed and acceleration parameters for the printer. Procedure: Home -> ReadPositionFromMCU -> MovesToolhead@Vel&Accel -> Home -> ReadPositionfromMCU
+
+gcode:
+    # Speed
+    {% set speed  = params.SPEED|default(printer.configfile.settings.printer.max_velocity)|int %}
+    # Iterations
+    {% set iterations = params.ITERATIONS|default(5)|int %}
+    # Acceleration
+    {% set accel  = params.ACCEL|default(printer.configfile.settings.printer.max_accel)|int %}
+    # Minimum Cruise Ratio
+    {% set min_cruise_ratio = params.MIN_CRUISE_RATIO|default(0.5)|float %}
+    # Bounding inset for large pattern (helps prevent slamming the toolhead into the sides after small skips, and helps to account for machines with imperfectly set dimensions)
+    {% set bound = params.BOUND|default(20)|int %}
+    # Size for small pattern box
+    {% set smallpatternsize = SMALLPATTERNSIZE|default(20)|int %}
+    
+    # Large pattern
+        # Max positions, inset by BOUND
+        {% set x_min = printer.toolhead.axis_minimum.x %}
+        {% if x_min < 0 %}
+            {% set x_min = 0 %}
+        {% endif %}
+    
+        {% set y_min = printer.toolhead.axis_minimum.y %}
+        {% if y_min < 0 %}
+            {% set y_min = 0 %}
+        {% endif %}
+    
+        {% set x_min = x_min + bound %}
+        {% set x_max = printer.toolhead.axis_maximum.x - bound %}
+        {% set y_min = y_min + bound %}
+        {% set y_max = printer.toolhead.axis_maximum.y - bound %}
+    
+    # Small pattern at center
+        # Find X/Y center point
+        {% set x_center = (printer.toolhead.axis_minimum.x|float + printer.toolhead.axis_maximum.x|float ) / 2 %}
+        {% set y_center = (printer.toolhead.axis_minimum.y|float + printer.toolhead.axis_maximum.y|float ) / 2 %}
+        
+        # Set small pattern box around center point
+        {% set x_center_min = x_center - (smallpatternsize/2) %}
+        {% set x_center_max = x_center + (smallpatternsize/2) %}
+        {% set y_center_min = y_center - (smallpatternsize/2) %}
+        {% set y_center_max = y_center + (smallpatternsize/2) %}
+
+    # Save current gcode state (absolute/relative, etc)
+    SAVE_GCODE_STATE NAME=TEST_SPEED
+    
+    # Output parameters to g-code terminal
+    { action_respond_info("TEST_SPEED: starting %d iterations at speed %d, accel %d" % (iterations, speed, accel)) }
+    
+    # Home and get position for comparison later:
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28
+        # QGL if not already QGLd (only if QGL section exists in config)
+        {% if printer.configfile.settings.quad_gantry_level %}
+            {% if printer.quad_gantry_level.applied == False %}
+                QUAD_GANTRY_LEVEL
+                G28 Z
+            {% endif %}
+        {% endif %} 
+        # Move 50mm away from max position and home again (to help with hall effect endstop accuracy - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/24)
+        G90
+        G1 X{printer.toolhead.axis_maximum.x-50} Y{printer.toolhead.axis_maximum.y-50} F{30*60}
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28 X Y
+        G0 X{printer.toolhead.axis_maximum.x-1} Y{printer.toolhead.axis_maximum.y-1} F{30*60}
+        G4 P1000 
+        GET_POSITION
+
+    # Go to starting position
+    G0 X{x_min} Y{y_min} Z{bound + 10} F{speed*60}
+
+    # Set new limits
+    {% if printer.configfile.settings.printer.minimum_cruise_ratio is defined %}
+        SET_VELOCITY_LIMIT VELOCITY={speed} ACCEL={accel} MINIMUM_CRUISE_RATIO={min_cruise_ratio}
+    {% else %}
+        SET_VELOCITY_LIMIT VELOCITY={speed} ACCEL={accel} ACCEL_TO_DECEL={accel / 2}
+    {% endif %}
+
+    {% for i in range(iterations) %}
+        # Large pattern diagonals
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_max} Y{y_max} F{speed*60}
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+        G0 X{x_min} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+        
+        # Large pattern box
+        G0 X{x_min} Y{y_min} F{speed*60}
+        G0 X{x_min} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_max} F{speed*60}
+        G0 X{x_max} Y{y_min} F{speed*60}
+    
+        # Small pattern diagonals
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_max} Y{y_center_max} F{speed*60}
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+        G0 X{x_center_min} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+        
+        # Small pattern box
+        G0 X{x_center_min} Y{y_center_min} F{speed*60}
+        G0 X{x_center_min} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_max} F{speed*60}
+        G0 X{x_center_max} Y{y_center_min} F{speed*60}
+    {% endfor %}
+
+    # Restore max speed/accel/accel_to_decel to their configured values
+    {% if printer.configfile.settings.printer.minimum_cruise_ratio is defined %}
+        SET_VELOCITY_LIMIT VELOCITY={printer.configfile.settings.printer.max_velocity} ACCEL={printer.configfile.settings.printer.max_accel} MINIMUM_CRUISE_RATIO={printer.configfile.settings.printer.minimum_cruise_ratio} 
+    {% else %}
+        SET_VELOCITY_LIMIT VELOCITY={printer.configfile.settings.printer.max_velocity} ACCEL={printer.configfile.settings.printer.max_accel} ACCEL_TO_DECEL={printer.configfile.settings.printer.max_accel_to_decel}
+    {% endif %}
+
+    # Re-home and get position again for comparison:
+        M400 # Finish moves - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/66
+        G28 # This is a full G28 to fix an issue with CoreXZ - https://github.com/AndrewEllis93/Print-Tuning-Guide/issues/12
+        # Go to XY home positions (in case your homing override leaves it elsewhere)
+        G90
+        G0 X{printer.toolhead.axis_maximum.x-1} Y{printer.toolhead.axis_maximum.y-1} F{30*60}
+        G4 P1000 
+        GET_POSITION
+
+    # Restore previous gcode state (absolute/relative, etc)
+    RESTORE_GCODE_STATE NAME=TEST_SPEED
+
+#*# <---------------------- SAVE_CONFIG ---------------------->
+#*# DO NOT EDIT THIS BLOCK OR BELOW. The contents are auto-generated.
+#*#
+#*# [heater_bed]
+#*# control = pid
+#*# pid_kp = 40.269
+#*# pid_ki = 1.123
+#*# pid_kd = 360.907
+#*#
+#*# [extruder]
+#*# control = pid
+#*# pid_kp = 25.778
+#*# pid_ki = 2.644
+#*# pid_kd = 62.834
+#*#
+#*# [stepper_z]
+#*# position_endstop = 1.670
+#*#
+#*# [bed_mesh default]
+#*# version = 1
+#*# points =
+#*# 	  0.177817, 0.166492, 0.154349, 0.145607, 0.141959, 0.133379, 0.123089, 0.120769, 0.119929, 0.119499, 0.116011, 0.118325, 0.116436, 0.120240, 0.117973, 0.113583, 0.117865, 0.126527, 0.126237, 0.119876, 0.121105, 0.118432, 0.119123, 0.122803, 0.132388, 0.138135, 0.143798, 0.144253, 0.139547, 0.140849
+#*# 	  0.155722, 0.141405, 0.130478, 0.125396, 0.121610, 0.116483, 0.111166, 0.107485, 0.105128, 0.103333, 0.102787, 0.105072, 0.108112, 0.109626, 0.106876, 0.102273, 0.107182, 0.115971, 0.117285, 0.108006, 0.112134, 0.110829, 0.110956, 0.112410, 0.118332, 0.125657, 0.132881, 0.135592, 0.132368, 0.138821
+#*# 	  0.145116, 0.131281, 0.123090, 0.113519, 0.109865, 0.107527, 0.100842, 0.096968, 0.096259, 0.092936, 0.090669, 0.095971, 0.099919, 0.103700, 0.106112, 0.103040, 0.102750, 0.107056, 0.105155, 0.101115, 0.104656, 0.104125, 0.102753, 0.103487, 0.110971, 0.113857, 0.119509, 0.122448, 0.123688, 0.129301
+#*# 	  0.135021, 0.115181, 0.105580, 0.101825, 0.096555, 0.092844, 0.085932, 0.083696, 0.079930, 0.077920, 0.081698, 0.086993, 0.090929, 0.099121, 0.102891, 0.097062, 0.096611, 0.097859, 0.094574, 0.092745, 0.095453, 0.092879, 0.092828, 0.092997, 0.097528, 0.100478, 0.107880, 0.113695, 0.117935, 0.129301
+#*# 	  0.114520, 0.094627, 0.081892, 0.076473, 0.072715, 0.068773, 0.066505, 0.064061, 0.060240, 0.060495, 0.059022, 0.058280, 0.062786, 0.068065, 0.077215, 0.077922, 0.075303, 0.076567, 0.073173, 0.068378, 0.068088, 0.067007, 0.067132, 0.068777, 0.074978, 0.078044, 0.084091, 0.092904, 0.098757, 0.107495
+#*# 	  0.098469, 0.072188, 0.057932, 0.053961, 0.051667, 0.050824, 0.048433, 0.045953, 0.043624, 0.039986, 0.037653, 0.039798, 0.046626, 0.051891, 0.061838, 0.064861, 0.063009, 0.062720, 0.059463, 0.055884, 0.057161, 0.054535, 0.054862, 0.057953, 0.062844, 0.069034, 0.075901, 0.085532, 0.091353, 0.103042
+#*# 	  0.098306, 0.066448, 0.050449, 0.045080, 0.041067, 0.041668, 0.040722, 0.038225, 0.035880, 0.032997, 0.037572, 0.036673, 0.038968, 0.042663, 0.054190, 0.058690, 0.058481, 0.056624, 0.051631, 0.049771, 0.047912, 0.042147, 0.042520, 0.041150, 0.045980, 0.050736, 0.059864, 0.069029, 0.075035, 0.082458
+#*# 	  0.079113, 0.049676, 0.035239, 0.032745, 0.024203, 0.023396, 0.023825, 0.021451, 0.020469, 0.016766, 0.019045, 0.023510, 0.024989, 0.028659, 0.043206, 0.049360, 0.047656, 0.045795, 0.043770, 0.037331, 0.032456, 0.025097, 0.025374, 0.021061, 0.027574, 0.033998, 0.046348, 0.058680, 0.066112, 0.073596
+#*# 	  0.070210, 0.040633, 0.030604, 0.023611, 0.016580, 0.014040, 0.014623, 0.013713, 0.011153, 0.004513, 0.005184, 0.008842, 0.014084, 0.017741, 0.030908, 0.038649, 0.041198, 0.039488, 0.033035, 0.024815, 0.016726, 0.007747, 0.005058, 0.004594, 0.010508, 0.015392, 0.027219, 0.038188, 0.052569, 0.061504
+#*# 	  0.061101, 0.039095, 0.024574, 0.018948, 0.011897, 0.006375, 0.002394, 0.002805, 0.001796, -0.001644, -0.001941, 0.000991, 0.007738, 0.011386, 0.021394, 0.029149, 0.030447, 0.028570, 0.021925, 0.013824, 0.007295, -0.000103, 0.000270, -0.000977, 0.002674, 0.007686, 0.020284, 0.034244, 0.048144, 0.061669
+#*# 	  0.059580, 0.036018, 0.024574, 0.012878, 0.005639, 0.000091, -0.003905, -0.006342, -0.007362, -0.007975, -0.009090, -0.005293, -0.001655, 0.003575, 0.012000, 0.019770, 0.019480, 0.016798, 0.009477, 0.002775, -0.003786, -0.009746, -0.012395, -0.011922, -0.010045, -0.004802, 0.006345, 0.020607, 0.035863, 0.045092
+#*# 	  0.046001, 0.023981, 0.008393, -0.001053, -0.008192, -0.013791, -0.016403, -0.017436, -0.018472, -0.020538, -0.018498, -0.016478, -0.009651, -0.005871, 0.004005, 0.010188, 0.009898, 0.004958, -0.000148, -0.008331, -0.013466, -0.017657, -0.017950, -0.018259, -0.016276, -0.009565, 0.001784, 0.015934, 0.029859, 0.043564
+#*# 	  0.044629, 0.027075, 0.009175, -0.004196, -0.009772, -0.016959, -0.021166, -0.020616, -0.023250, -0.025325, -0.024742, -0.021208, -0.015909, -0.010687, 0.000078, 0.004736, 0.002037, -0.001310, -0.008041, -0.017875, -0.021410, -0.027224, -0.028214, -0.027758, -0.024287, -0.020556, -0.009270, 0.003586, 0.020737, 0.031626
+#*# 	  0.040027, 0.017774, 0.001512, -0.010336, -0.017598, -0.021721, -0.025862, -0.028427, -0.029480, -0.031649, -0.029558, -0.027560, -0.020573, -0.012294, -0.002254, 0.005537, 0.002037, -0.002917, -0.011115, -0.018032, -0.024659, -0.030476, -0.031456, -0.030988, -0.027341, -0.019757, -0.009903, 0.005073, 0.019961, 0.029926
+#*# 	  0.041563, 0.022430, 0.006050, -0.005767, -0.014510, -0.018546, -0.022758, -0.025236, -0.029480, -0.031649, -0.031163, -0.027560, -0.022342, -0.015358, -0.006272, 0.002326, 0.003644, -0.007752, -0.017743, -0.025995, -0.029383, -0.036837, -0.036327, -0.035841, -0.030559, -0.023752, -0.014022, -0.002539, 0.011576, 0.022382
+#*# 	  0.044629, 0.019325, 0.004646, -0.005609, -0.014510, -0.020132, -0.027377, -0.030023, -0.032682, -0.033175, -0.030361, -0.025949, -0.020733, -0.017047, -0.006918, -0.005561, -0.004318, -0.010982, -0.019209, -0.027621, -0.029383, -0.032102, -0.031614, -0.032603, -0.025736, -0.020556, -0.007526, 0.004994, 0.020737, 0.037603
+#*# 	  0.056696, 0.034638, 0.018363, 0.003654, -0.005828, -0.015454, -0.021962, -0.026829, -0.027880, -0.028524, -0.026347, -0.022737, -0.017515, -0.010687, -0.002254, 0.007142, -0.001176, -0.007752, -0.015967, -0.025995, -0.027910, -0.030476, -0.031456, -0.029374, -0.024932, -0.020556, -0.010061, 0.002801, 0.018409, 0.036069
+#*# 	  0.068694, 0.036176, 0.016967, 0.002088, -0.008192, -0.015376, -0.021166, -0.023801, -0.023092, -0.023729, -0.023141, -0.021208, -0.015909, -0.007474, 0.005607, 0.005460, 0.001234, -0.001310, -0.012887, -0.019656, -0.019946, -0.023980, -0.023519, -0.024692, -0.020920, -0.017364, -0.007526, 0.008125, 0.020737, 0.039136
+#*# 	  0.073072, 0.042938, 0.021469, 0.008192, -0.002052, -0.009205, -0.014815, -0.019024, -0.020063, -0.020538, -0.019940, -0.017921, -0.012698, -0.001220, 0.002404, 0.016420, 0.005247, 0.006405, -0.004898, -0.010754, -0.011851, -0.017579, -0.020289, -0.021472, -0.017716, -0.012744, -0.004525, 0.008125, 0.023675, 0.037442
+#*# 	  0.067178, 0.041402, 0.023022, 0.014436, 0.008931, 0.003234, -0.005484, -0.007922, -0.012117, -0.012738, -0.010680, -0.008482, -0.001655, 0.008201, 0.018214, 0.016581, 0.016291, 0.013605, 0.007874, 0.004379, 0.002486, -0.000982, -0.001330, -0.005603, -0.002088, 0.002952, 0.011056, 0.023558, 0.037402, 0.051195
+#*# 	  0.074749, 0.057315, 0.039861, 0.032908, 0.027307, 0.020283, 0.011652, 0.005950, 0.004949, 0.002776, 0.003524, 0.004086, 0.010914, 0.018455, 0.024569, 0.025974, 0.028067, 0.025394, 0.020335, 0.013824, 0.013534, 0.009343, 0.009838, 0.008563, 0.008846, 0.012407, 0.018721, 0.029764, 0.043546, 0.052555
+#*# 	  0.074584, 0.055789, 0.044314, 0.036609, 0.029553, 0.023316, 0.014702, 0.012147, 0.011234, 0.010648, 0.009762, 0.013427, 0.020255, 0.027082, 0.032328, 0.033905, 0.036619, 0.034909, 0.029707, 0.023228, 0.024526, 0.021924, 0.020788, 0.019482, 0.023653, 0.027761, 0.034748, 0.044190, 0.053332, 0.063019
+#*# 	  0.081374, 0.067804, 0.057932, 0.052590, 0.045685, 0.037033, 0.026935, 0.024568, 0.025152, 0.024587, 0.023673, 0.024297, 0.029710, 0.036379, 0.041714, 0.044011, 0.044429, 0.041067, 0.037621, 0.032746, 0.033881, 0.029689, 0.028530, 0.027360, 0.030547, 0.033998, 0.041713, 0.051022, 0.060194, 0.073596
+#*# 	  0.087982, 0.075215, 0.068429, 0.061600, 0.056105, 0.046290, 0.037632, 0.032183, 0.034327, 0.033935, 0.032977, 0.035112, 0.039671, 0.045715, 0.052624, 0.054774, 0.053781, 0.050350, 0.047076, 0.042066, 0.041776, 0.040575, 0.039384, 0.038024, 0.044585, 0.047805, 0.052348, 0.060045, 0.069145, 0.080957
+#*# 	  0.105767, 0.096125, 0.087759, 0.079501, 0.072796, 0.064443, 0.053655, 0.051264, 0.051019, 0.049879, 0.048202, 0.049139, 0.054412, 0.059683, 0.064957, 0.083343, 0.098149, 0.070351, 0.057740, 0.052912, 0.052622, 0.049996, 0.051745, 0.053457, 0.059757, 0.059986, 0.062244, 0.067670, 0.075117, 0.079619
+#*# 	  0.120446, 0.107911, 0.098268, 0.092909, 0.086177, 0.074858, 0.064978, 0.067119, 0.066369, 0.067312, 0.066554, 0.068760, 0.072670, 0.078727, 0.084011, 0.089363, 0.093534, 0.079669, 0.074724, 0.069932, 0.072594, 0.071506, 0.074703, 0.079389, 0.087046, 0.087015, 0.085606, 0.095910, 0.100251, 0.098742
+#*# 	  0.136326, 0.126940, 0.115840, 0.109213, 0.104051, 0.095693, 0.085932, 0.082180, 0.082806, 0.082485, 0.081698, 0.084101, 0.087869, 0.091632, 0.095394, 0.095363, 0.091996, 0.091865, 0.086950, 0.083732, 0.084826, 0.085266, 0.086858, 0.094521, 0.104260, 0.106506, 0.112371, 0.116670, 0.117935, 0.107495
+#*# 	  0.142024, 0.132753, 0.123090, 0.117982, 0.111357, 0.104697, 0.094988, 0.095623, 0.096259, 0.097304, 0.096572, 0.100527, 0.102961, 0.106747, 0.109002, 0.110529, 0.108711, 0.108503, 0.105235, 0.100348, 0.104576, 0.103524, 0.107918, 0.113921, 0.124331, 0.130129, 0.132881, 0.137065, 0.131060, 0.120476
+#*# 	  0.149250, 0.144167, 0.137674, 0.134094, 0.133285, 0.126719, 0.117137, 0.116294, 0.119929, 0.123812, 0.122753, 0.121413, 0.125905, 0.130637, 0.134452, 0.135344, 0.131359, 0.131069, 0.129101, 0.124431, 0.127173, 0.128866, 0.131775, 0.131644, 0.140579, 0.140195, 0.145843, 0.152878, 0.148325, 0.137926
+#*# 	  0.172218, 0.158759, 0.152161, 0.149268, 0.145632, 0.142633, 0.139051, 0.136761, 0.138905, 0.140146, 0.135270, 0.140604, 0.145778, 0.149788, 0.153631, 0.153726, 0.147606, 0.145815, 0.145689, 0.143733, 0.149446, 0.149582, 0.148079, 0.149378, 0.156540, 0.159932, 0.164000, 0.170827, 0.171226, 0.160859
+#*# x_count = 30
+#*# y_count = 30
+#*# mesh_x_pps = 0
+#*# mesh_y_pps = 0
+#*# algo = bicubic
+#*# tension = 0.2
+#*# min_x = 16.0
+#*# max_x = 330.0
+#*# min_y = 28.0
+#*# max_y = 335.0
+#*#
+#*# [cartographer touch_model default]
+#*# threshold = 1073
+#*# speed = 2
+#*# z_offset = -0.05
+#*#
+#*# [cartographer scan_model default]
+#*# coefficients = 1.3368953316158376,1.7985964094888378,0.8216337428675446,0.31330340798379136,0.5316626692708982,0.9044777279624613,-0.3752598369778359,-0.9438783397883804,0.4853497526827601,0.6288912453552058
+#*# domain = 3.094271692848586e-07,3.336718536588228e-07
+#*# z_offset = 0
+#*# reference_temperature = 25.99
+#*#
+#*# [cartographer]
+#*# z_backlash = 0.00568
+#*#
+#*# [axis_twist_compensation]
+#*# z_compensations = -0.024240, -0.011869, 0.027533, 0.025861, -0.017285
+#*# compensation_start_x = 50.0
+#*# compensation_end_x = 300.0
